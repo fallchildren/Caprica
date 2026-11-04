@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <papyrus/PapyrusScript.h>
 
 #ifdef _WIN32
@@ -22,7 +23,10 @@ pex::PexFile* PapyrusScript::buildPex(CapricaReportingContext& repCtx) const {
     pex->debugInfo->modificationTime = lastModificationTime;
   }
   pex->compilationTime = time(nullptr);
-  pex->sourceFileName = pex->alloc->allocateString(sourceFileName);
+  if (conf::General::anonymizeOutput)
+    pex->sourceFileName = pex->alloc->allocateString(std::filesystem::path(sourceFileName).filename().string());
+  else
+    pex->sourceFileName = pex->alloc->allocateString(sourceFileName);
 
   static std::string computerName = []() -> std::string {
 #ifdef _WIN32
@@ -39,7 +43,7 @@ pex::PexFile* PapyrusScript::buildPex(CapricaReportingContext& repCtx) const {
     return std::string(compNameBuf);
 #endif
   }();
-  pex->computerName = computerName;
+  pex->computerName = conf::General::anonymizeOutput ? std::string() : computerName;
 
   static std::string userName = []() -> std::string {
 #ifdef _WIN32
@@ -57,7 +61,7 @@ pex::PexFile* PapyrusScript::buildPex(CapricaReportingContext& repCtx) const {
     return std::string(u ? u : "unknown");
 #endif
   }();
-  pex->userName = userName;
+  pex->userName = conf::General::anonymizeOutput ? std::string() : userName;
 
   for (auto o : objects)
     o->buildPex(repCtx, pex);
