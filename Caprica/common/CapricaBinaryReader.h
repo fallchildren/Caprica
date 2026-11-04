@@ -6,6 +6,8 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <type_traits>
+#include <ctime>
 
 namespace caprica {
 
@@ -24,72 +26,26 @@ struct CapricaBinaryReader {
 
   template <typename T>
   T read() {
-    static_assert(std::is_same_v<T, void>, "Invalid type passed to read!");
-  }
-
-  template <>
-  int8_t read() {
-    int8_t val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  uint8_t read() {
-    uint8_t val = 0;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  int16_t read() {
-    int16_t val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  uint16_t read() {
-    uint16_t val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  int32_t read() {
-    int32_t val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  uint32_t read() {
-    uint32_t val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  float read() {
-    float val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap_float(val);
-  }
-
-  template <>
-  time_t read() {
-    static_assert(sizeof(time_t) == 8, "time_t is not 64 bits");
-    time_t val;
-    strm.read((char*)&val, sizeof(val));
-    return endianness == Endianness::Little ? val : byteswap(val);
-  }
-
-  template <>
-  std::string read() {
-    auto len = read<uint16_t>();
-    std::unique_ptr<char[]> buf(new char[len]);
-    strm.read(buf.get(), len);
-    return std::string(buf.get(), buf.get() + len);
+    if constexpr (std::is_same_v<T, std::string>) {
+      auto len = read<uint16_t>();
+      std::unique_ptr<char[]> buf(new char[len]);
+      strm.read(buf.get(), len);
+      return std::string(buf.get(), buf.get() + len);
+    } else if constexpr (std::is_same_v<T, float>) {
+      float val;
+      strm.read((char*)&val, sizeof(val));
+      return endianness == Endianness::Little ? val : byteswap_float(val);
+    } else if constexpr (std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t> || std::is_same_v<T, int16_t> ||
+                         std::is_same_v<T, uint16_t> || std::is_same_v<T, int32_t> || std::is_same_v<T, uint32_t> ||
+                         std::is_same_v<T, time_t>) {
+      if constexpr (std::is_same_v<T, time_t>)
+        static_assert(sizeof(time_t) == 8, "time_t is not 64 bits");
+      T val {};
+      strm.read((char*)&val, sizeof(val));
+      return endianness == Endianness::Little ? val : byteswap(val);
+    } else {
+      static_assert(std::is_same_v<T, void>, "Invalid type passed to read!");
+    }
   }
 
 protected:

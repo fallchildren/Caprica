@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 
 #include <common/CapricaBinaryWriter.h>
 #include <common/CapricaReportingContext.h>
@@ -21,27 +22,21 @@ struct PexWriter final : public CapricaBinaryWriter {
 
   template <typename T>
   void write(T val) {
-    CapricaBinaryWriter::write<T>(std::forward<T>(val));
+    if constexpr (std::is_same_v<T, GameID>) {
+      write<uint16_t>(static_cast<uint16_t>(val));
+    } else if constexpr (std::is_same_v<T, PexString>) {
+      assert(val.index != -1);
+      boundWrite<uint16_t>(val.index);
+    } else if constexpr (std::is_same_v<T, PexUserFlags>) {
+      boundWrite<uint32_t>(val.data);
+    } else if constexpr (std::is_same_v<T, PexValue>) {
+      writeValue(val);
+    } else {
+      CapricaBinaryWriter::write<T>(std::forward<T>(val));
+    }
   }
 
-  template <>
-  void write(GameID val) {
-    write<uint16_t>(static_cast<uint16_t>(val));
-  }
-
-  template <>
-  void write(PexString val) {
-    assert(val.index != -1);
-    boundWrite<uint16_t>(val.index);
-  }
-
-  template <>
-  void write(PexUserFlags val) {
-    boundWrite<uint32_t>(val.data);
-  }
-
-  template <>
-  void write(PexValue val) {
+  void writeValue(PexValue val) {
     write<uint8_t>((uint8_t)val.type);
     switch (val.type) {
       case PexValueType::None:

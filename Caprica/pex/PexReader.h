@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <type_traits>
 
 #include <common/CapricaBinaryReader.h>
 #include <common/CapricaReportingContext.h>
@@ -22,30 +23,24 @@ struct PexReader final : public CapricaBinaryReader {
 
   template <typename T>
   T read() {
-    return CapricaBinaryReader::read<T>();
+    if constexpr (std::is_same_v<T, GameID>) {
+      return (GameID)read<uint16_t>();
+    } else if constexpr (std::is_same_v<T, PexString>) {
+      PexString val;
+      val.index = read<uint16_t>();
+      return val;
+    } else if constexpr (std::is_same_v<T, PexUserFlags>) {
+      PexUserFlags val;
+      val.data = read<uint32_t>();
+      return val;
+    } else if constexpr (std::is_same_v<T, PexValue>) {
+      return readValue();
+    } else {
+      return CapricaBinaryReader::read<T>();
+    }
   }
 
-  template <>
-  GameID read() {
-    return (GameID)read<uint16_t>();
-  }
-
-  template <>
-  PexString read() {
-    PexString val;
-    val.index = read<uint16_t>();
-    return val;
-  }
-
-  template <>
-  PexUserFlags read() {
-    PexUserFlags val;
-    val.data = read<uint32_t>();
-    return val;
-  }
-
-  template <>
-  PexValue read() {
+  PexValue readValue() {
     PexValue val;
     val.type = (PexValueType)read<uint8_t>();
     switch (val.type) {

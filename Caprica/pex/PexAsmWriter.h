@@ -6,6 +6,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include <pex/PexUserFlags.h>
 
@@ -21,35 +22,19 @@ struct PexAsmWriter final {
 
   template <typename T>
   void writeKV(const char* key, T val) {
-    static_assert(std::is_same_v<T, void>, "Unknown type for the value!");
-  }
-
-  template <>
-  void writeKV(const char* key, time_t val) {
     ensureIndent();
-    // TODO: Add a comment output of the times in the local time.
-    strm << '.' << key << ' ' << (unsigned long long)val;
-    writeln();
-  }
-
-  template <>
-  void writeKV(const char* key, std::string val) {
-    ensureIndent();
-    strm << '.' << key << " \"" << escapeString(val) << "\"";
-    writeln();
-  }
-
-  template <>
-  void writeKV(const char* key, std::string_view val) {
-    ensureIndent();
-    strm << '.' << key << " \"" << escapeString(std::string(val)) << "\"";
-    writeln();
-  }
-
-  template <>
-  void writeKV(const char* key, PexUserFlags val) {
-    ensureIndent();
-    strm << '.' << key << " " << val.data;
+    if constexpr (std::is_same_v<T, time_t>) {
+      // TODO: Add a comment output of the times in the local time.
+      strm << '.' << key << ' ' << (unsigned long long)val;
+    } else if constexpr (std::is_same_v<T, std::string>) {
+      strm << '.' << key << " \"" << escapeString(val) << "\"";
+    } else if constexpr (std::is_same_v<T, std::string_view>) {
+      strm << '.' << key << " \"" << escapeString(std::string(val)) << "\"";
+    } else if constexpr (std::is_same_v<T, PexUserFlags>) {
+      strm << '.' << key << " " << val.data;
+    } else {
+      static_assert(std::is_same_v<T, void>, "Unknown type for the value!");
+    }
     writeln();
   }
 
