@@ -111,10 +111,15 @@ private:
     Iterator(T* mFront) : cur(mFront) { }
   };
 
+  template <typename U>
+  static U* nextOf(U* v) {
+    return v->next;
+  }
+
   template <typename T2>
-  friend struct ConstLockstepIteratorWrapper;
+  struct ConstLockstepIteratorWrapper;
   template <typename T2>
-  friend struct LockstepIteratorWrapper;
+  struct LockstepIteratorWrapper;
 
 public:
   template <typename T2>
@@ -127,8 +132,8 @@ public:
       index++;
       cur.prevSelf = cur.self;
       cur.prevOther = cur.other;
-      cur.self = cur.self->next;
-      cur.other = cur.other->next;
+      cur.self = IntrusiveLinkedList::nextOf(cur.self);
+      cur.other = IntrusiveLinkedList::nextOf(cur.other);
       return *this;
     }
 

@@ -1,4 +1,5 @@
 #pragma once
+#include <common/UtilMacros.h>
 
 #include <common/CapricaFileLocation.h>
 #include <papyrus/PapyrusResolutionContext.h>

@@ -99,7 +99,7 @@ if(CAPRICA_STATIC_LIBRARY)
   find_package(fmt REQUIRED)
   find_package(pugixml CONFIG REQUIRED)
   target_link_libraries(${PROJECT_NAME} PRIVATE Boost::container fmt::fmt)
-  target_link_libraries(${PROJECT_NAME} PRIVATE pugixml pugixml::static pugixml::pugixml)
+  target_link_libraries(${PROJECT_NAME} PRIVATE pugixml pugixml::pugixml)
 
   target_include_directories(
     "${PROJECT_NAME}"
@@ -141,10 +141,13 @@ else()
     ${CMAKE_CURRENT_SOURCE_DIR}/Caprica
     ${Boost_INCLUDE_DIRS}
   )
+  if(NOT MSVC)
+    add_compile_options(-msse4.2)
+  endif()
   add_subdirectory(Caprica)
   add_dependencies(${PROJECT_NAME} Caprica)
   target_link_libraries(${PROJECT_NAME} PRIVATE Boost::filesystem Boost::program_options Boost::container fmt::fmt)
-  target_link_libraries(${PROJECT_NAME} PRIVATE pugixml pugixml::static pugixml::pugixml)
+  target_link_libraries(${PROJECT_NAME} PRIVATE pugixml pugixml::pugixml)
 
   install(
     TARGETS Caprica

@@ -219,6 +219,7 @@ PapyrusValue PapyrusResolutionContext::coerceDefaultValue(const PapyrusValue& va
     case PapyrusType::Kind::Array:
     case PapyrusType::Kind::ResolvedObject:
     case PapyrusType::Kind::ResolvedStruct:
+    case PapyrusType::Kind::Var:
       if (val.getPapyrusType().type == PapyrusType::Kind::None)
         return val;
       break;

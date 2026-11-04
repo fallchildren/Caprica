@@ -27,7 +27,7 @@
 #include <pex/PexReader.h>
 #include <pex/PexWriter.h>
 
-#include <Windows.h>
+#include <chrono>
 
 namespace conf = caprica::conf;
 namespace FSUtils = caprica::FSUtils;
@@ -97,14 +97,6 @@ PapyrusCompilationNode* getNode(const PapyrusCompilationNode::NodeType& nodeType
                                 const std::filesystem::path& baseOutputDir,
                                 const std::filesystem::path& curDir,
                                 const std::filesystem::path& absBaseDir,
-                                const WIN32_FIND_DATA& data,
-                                bool strictNS);
-
-PapyrusCompilationNode* getNode(const PapyrusCompilationNode::NodeType& nodeType,
-                                CapricaJobManager* jobManager,
-                                const std::filesystem::path& baseOutputDir,
-                                const std::filesystem::path& curDir,
-                                const std::filesystem::path& absBaseDir,
                                 const std::filesystem::path& fileName,
                                 time_t lastModTime,
                                 size_t fileSize,
@@ -149,26 +141,27 @@ bool addFilesFromDirectory(const IInputFile& input,
   const auto DOT = std::string_view(".");
 
   while (dirs.size()) {
-    HANDLE hFind;
-    WIN32_FIND_DATA data;
     auto curDir = dirs.back();
     dirs.pop_back();
-    auto curSearchPattern = absBaseDir / curDir / "*";
+    auto curSearchPattern = absBaseDir / curDir;
     caprica::caseless_unordered_identifier_ref_map<PapyrusCompilationNode *> namespaceMap{};
     namespaceMap.reserve(8000);
 
-    hFind = FindFirstFileA(curSearchPattern.string().c_str(), &data);
-    if (hFind == INVALID_HANDLE_VALUE) {
+    std::error_code dirEc;
+    std::filesystem::directory_iterator dirIt(curSearchPattern, dirEc);
+    if (dirEc) {
       std::cout << "An error occurred while trying to iterate the files in '" << curSearchPattern << "'!" << std::endl;
       return false;
     }
 
-    do {
-      std::string_view filenameRef = data.cFileName;
+    for (const auto& dirEntry : dirIt) {
+      const std::string fileNameStr = dirEntry.path().filename().string();
+      std::string_view filenameRef = fileNameStr;
       if (filenameRef != DOT && filenameRef != DOTDOT) {
-        if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        std::error_code entEc;
+        if (dirEntry.is_directory(entEc)) {
           if (recursive)
-            dirs.push_back(curDir / data.cFileName);
+            dirs.push_back(curDir / fileNameStr);
         } else {
           auto ext = FSUtils::extensionAsRef(filenameRef);
           bool skip = false;
@@ -194,8 +187,20 @@ bool addFilesFromDirectory(const IInputFile& input,
               break;
           }
           if (!skip) {
-            PapyrusCompilationNode* node =
-                getNode(nodeType, jobManager, baseOutputDir, curDir, absBaseDir, data, !input.requiresRemap());
+            std::error_code tmEc;
+            auto ftime = dirEntry.last_write_time(tmEc);
+            time_t lastModTime = std::chrono::system_clock::to_time_t(
+                std::chrono::clock_cast<std::chrono::system_clock>(ftime));
+            size_t fileSize = (size_t)dirEntry.file_size(tmEc);
+            PapyrusCompilationNode* node = getNode(nodeType,
+                                                   jobManager,
+                                                   baseOutputDir,
+                                                   curDir,
+                                                   absBaseDir,
+                                                   fileNameStr,
+                                                   lastModTime,
+                                                   fileSize,
+                                                   !input.requiresRemap());
 
             namespaceMap.emplace(caprica::identifier_ref(node->baseName), node);
             if (!gBaseFound && !baseDirMap.empty()) {
@@ -207,8 +212,7 @@ bool addFilesFromDirectory(const IInputFile& input,
           }
         }
       }
-    } while (FindNextFileA(hFind, &data));
-    FindClose(hFind);
+    }
 
     if (conf::Papyrus::game > GameID::Skyrim) {
       if (!namespaceMap.empty()) {
@@ -273,36 +277,6 @@ PapyrusCompilationNode* getNode(const PapyrusCompilationNode::NodeType& nodeType
                                                            fileSize,
                                                            strictNS);
   return node;
-}
-
-PapyrusCompilationNode* getNode(const PapyrusCompilationNode::NodeType& nodeType,
-                                CapricaJobManager* jobManager,
-                                const std::filesystem::path& baseOutputDir,
-                                const std::filesystem::path& curDir,
-                                const std::filesystem::path& absBaseDir,
-                                const WIN32_FIND_DATA& data,
-                                bool strictNS) {
-  const auto lastModTime = [](FILETIME ft) -> time_t {
-    ULARGE_INTEGER ull;
-    ull.LowPart = ft.dwLowDateTime;
-    ull.HighPart = ft.dwHighDateTime;
-    return ull.QuadPart / 10000000ULL - 11644473600ULL;
-  }(data.ftLastWriteTime);
-  const auto fileSize = [](DWORD low, DWORD high) {
-    ULARGE_INTEGER ull;
-    ull.LowPart = low;
-    ull.HighPart = high;
-    return ull.QuadPart;
-  }(data.nFileSizeLow, data.nFileSizeHigh);
-  return getNode(nodeType,
-                 jobManager,
-                 baseOutputDir,
-                 curDir,
-                 absBaseDir,
-                 data.cFileName,
-                 lastModTime,
-                 fileSize,
-                 strictNS);
 }
 
 bool handleImports(const std::vector<ImportDir>& f, caprica::CapricaJobManager* jobManager) {

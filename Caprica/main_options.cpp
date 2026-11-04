@@ -1,4 +1,5 @@
 
+#include <common/UtilMacros.h>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/property_tree/json_parser.hpp>

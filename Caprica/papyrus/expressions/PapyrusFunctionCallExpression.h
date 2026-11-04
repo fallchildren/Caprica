@@ -25,10 +25,7 @@ struct PapyrusFunctionCallExpression final : public PapyrusExpression {
 
   private:
     template <typename T>
-    friend struct IntrusiveLinkedList;
-    template <typename T>
-    template <typename T2>
-    friend struct IntrusiveLinkedList<T>::LockstepIterator;
+    friend struct ::caprica::IntrusiveLinkedList;
     Parameter* next { nullptr };
   };
   PapyrusIdentifier function;

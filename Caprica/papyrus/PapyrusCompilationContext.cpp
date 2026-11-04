@@ -1,8 +1,7 @@
+#include <common/UtilMacros.h>
 #include <papyrus/PapyrusCompilationContext.h>
 
-#include <fcntl.h>
 #include <filesystem>
-#include <io.h>
 #include <iostream>
 
 #include <common/allocators/AtomicChainedPool.h>
@@ -80,21 +79,6 @@ void PapyrusCompilationNode::FileReadJob::run() {
     parent->readFileData = parent->ownedReadFileData;
     return;
   }
-  if (parent->filesize < std::numeric_limits<uint32_t>::max()) {
-    auto buf = readAllocator.allocate(parent->filesize + 1);
-    auto fd = _open(parent->sourceFilePath.c_str(), _O_BINARY | _O_RDONLY | _O_SEQUENTIAL);
-    if (fd != -1) {
-      auto len = _read(fd, (void*)buf, (uint32_t)parent->filesize);
-      parent->readFileData = std::string_view(buf, len);
-      if (_eof(fd) == 1) {
-        _close(fd);
-        // Need this to be null terminated.
-        buf[parent->filesize] = '\0';
-        return;
-      }
-      _close(fd);
-    }
-  }
   {
     std::string str;
     str.resize(parent->filesize);
@@ -114,7 +98,8 @@ void PapyrusCompilationNode::FileReadJob::run() {
     }
     str += '\0';
     parent->ownedReadFileData = std::move(str);
-    parent->readFileData = parent->ownedReadFileData;
+    // The view must not include the trailing NUL terminator.
+    parent->readFileData = std::string_view(parent->ownedReadFileData.data(), parent->ownedReadFileData.size() - 1);
   }
 }
 
@@ -126,8 +111,14 @@ std::string_view findScriptName(const std::string_view& data, const std::string_
       next = data.size() - 1;
     auto line = data.substr(last, next - last);
     auto begin = line.find_first_not_of(" \t");
+    if (begin == std::string_view::npos) {
+      last = next + 1;
+      continue;
+    }
     if (strnicmp(line.substr(begin, startstring.size()).data(), startstring.data(), startstring.size()) == 0) {
       auto first = line.find_first_not_of(" \t", startstring.size() + begin);
+      if (first == std::string_view::npos)
+        return {};
       return line.substr(first, line.find_first_of(" \t", first) - first);
     }
     last = next + 1;

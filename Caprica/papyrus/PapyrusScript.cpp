@@ -1,7 +1,12 @@
 #include <papyrus/PapyrusScript.h>
 
+#ifdef _WIN32
 #include <lmcons.h>
 #include <Windows.h>
+#else
+#include <unistd.h>
+#include <cstdlib>
+#endif
 
 #include <common/CapricaConfig.h>
 #include <common/EngineLimits.h>
@@ -20,15 +25,24 @@ pex::PexFile* PapyrusScript::buildPex(CapricaReportingContext& repCtx) const {
   pex->sourceFileName = pex->alloc->allocateString(sourceFileName);
 
   static std::string computerName = []() -> std::string {
+#ifdef _WIN32
     char compNameBuf[MAX_COMPUTERNAME_LENGTH + 1];
     DWORD compNameBufLength = sizeof(compNameBuf);
     if (!GetComputerNameA(compNameBuf, &compNameBufLength))
       CapricaReportingContext::logicalFatal("Failed to get the computer name!");
     return std::string(compNameBuf, compNameBufLength);
+#else
+    char compNameBuf[256];
+    if (gethostname(compNameBuf, sizeof(compNameBuf)) != 0)
+      CapricaReportingContext::logicalFatal("Failed to get the computer name!");
+    compNameBuf[sizeof(compNameBuf) - 1] = '\0';
+    return std::string(compNameBuf);
+#endif
   }();
   pex->computerName = computerName;
 
   static std::string userName = []() -> std::string {
+#ifdef _WIN32
     char userNameBuf[UNLEN + 1];
     DWORD userNameBufLength = sizeof(userNameBuf);
     if (!GetUserNameA(userNameBuf, &userNameBufLength))
@@ -36,6 +50,12 @@ pex::PexFile* PapyrusScript::buildPex(CapricaReportingContext& repCtx) const {
     if (userNameBufLength > 0)
       userNameBufLength--;
     return std::string(userNameBuf, userNameBufLength);
+#else
+    const char* u = getenv("USER");
+    if (!u)
+      u = getenv("USERNAME");
+    return std::string(u ? u : "unknown");
+#endif
   }();
   pex->userName = userName;
 

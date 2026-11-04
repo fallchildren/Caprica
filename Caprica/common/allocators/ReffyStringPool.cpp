@@ -1,7 +1,11 @@
 #include <common/allocators/ReffyStringPool.h>
 
 #include <assert.h>
+#ifdef _MSC_VER
 #include <intrin.h>
+#else
+#include <immintrin.h>
+#endif
 
 namespace caprica { namespace allocators {
 

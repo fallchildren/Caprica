@@ -16,15 +16,23 @@ struct ChainedPool {
   ~ChainedPool();
 
   char* allocate(size_t size);
+#ifdef _MSC_VER
+#define _caprica_allocator __declspec(allocator)
+#define _caprica_assume(x) __assume(x)
+#else
+#define _caprica_allocator
+#define _caprica_assume(x) do { if (!(x)) __builtin_unreachable(); } while (0)
+#endif
+
   template <typename T, typename... Args>
-  __declspec(allocator) T* make(Args&&... args) {
+  _caprica_allocator T* make(Args&&... args) {
     if (std::is_trivially_destructible<T>::value) {
       auto t = allocate(sizeof(T));
-      __assume(t != nullptr);
+      _caprica_assume(t != nullptr);
       return new (t) T(std::forward<Args>(args)...);
     }
     auto buf = allocate(sizeof(DestructionNode) + sizeof(T));
-    __assume(buf != nullptr);
+    _caprica_assume(buf != nullptr);
     auto node = (DestructionNode*)buf;
     node->destructor = [](void* val) {
       ((T*)val)->~T();
